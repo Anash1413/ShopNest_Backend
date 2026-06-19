@@ -8,7 +8,11 @@ exports.protect = async (req , res, next)=>{
             const token = req.headers.authorization.split(' ')[1]
             if(token){
                 const decoded = jwt.verify(token , process.env.JWT_SECRET_KEY )
-                req.user = await userModel.findById(decoded.id).select('-password') 
+                req.user = await userModel.findById(decoded.id).select('-password')
+                if (!req.user) {
+                    console.log("user not found during token verification 017");
+                    return res.status(401).json({ message: "user not found. please login again" });
+                }
                 next()
             }
             else {

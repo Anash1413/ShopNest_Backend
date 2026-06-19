@@ -84,7 +84,11 @@ exports.postLogin = async (req, res, next) => {
         User.otp = otp
         User.otpExpires = otpExpires
         await User.save()
-         sendMaiil(User.email, "Your 2FA Login Code", `Your OTP code is: ${otp}`)
+        try {
+          await sendMaiil(User.email, "Your 2FA Login Code", `Your OTP code is: ${otp}`)
+        } catch (error) {
+          return res.status(503).json({ message: "failed to send OTP email. please try again later" })
+        }
         return res.json({ 
           twoFA: true, 
           message: "Please verify the OTP sent to your email",
@@ -117,18 +121,28 @@ exports.getAllUsers = (req, res, next) => {
 }
 
 exports.sendOtp = async (req , res , next) =>{
-  const User = await userModel.findById(req.user._id)
-   const otp = Math.floor(100000 + Math.random()*900000)
-        const otpExpires = new Date( Date.now() + 10*60*1000)
-        User.otp = otp
-        User.otpExpires = otpExpires
-        await User.save()
-        await sendMaiil(User.email, "Your 2FA Login Code", `Your OTP code is: ${otp}`)
-        return res.json({ 
-          twoFA: true, 
-          message: " OTP sent to your email",
-          email: User.email 
-        })
+  try {
+    const User = await userModel.findById(req.user._id)
+    if (!User) {
+      return res.status(404).json({ message: "user not found" })
+    }
+
+    const otp = Math.floor(100000 + Math.random()*900000)
+    const otpExpires = new Date( Date.now() + 10*60*1000)
+    User.otp = otp
+    User.otpExpires = otpExpires
+    await User.save()
+    await sendMaiil(User.email, "Your 2FA Login Code", `Your OTP code is: ${otp}`)
+    return res.json({ 
+      twoFA: true, 
+      message: " OTP sent to your email",
+      email: User.email 
+    })
+  } catch (error) {
+    const message = "error in sending OTP"
+    console.log(message,error)
+    return res.status(503).json({message})
+  }
 }
 exports.Toggle2FA = async (req ,res) =>{
    try {
