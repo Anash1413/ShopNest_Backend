@@ -1,31 +1,41 @@
 const dns = require('dns')
 dns.setDefaultResultOrder('ipv4first')
-const  nodemailer = require('nodemailer')
 
 exports.sendMaiil = async (to , subject , text )=>{
    try {
-       const smtpPort = Number(process.env.SMTP_PORT || 587)
-       const transportser = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.gmail.com",
-        port: smtpPort,
-        secure: process.env.SMTP_SECURE === "true" || smtpPort === 465,
-        auth:{
-          user:process.env.EMAIL_USER,
-          pass:process.env.EMAIL_PASS
-        },
-        family: 4,
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 30000
-       })
-       await transportser.sendMail({
-        from:process.env.EMAIL_USER,
-        to,
-        subject,
-        text
-       })
+       const relayUrl = process.env.GMAIL_RELAY_URL;
+       const relayToken = process.env.GMAIL_RELAY_TOKEN;
+       
+       if (!relayUrl || !relayToken) {
+           console.error("GMAIL_RELAY_URL or GMAIL_RELAY_TOKEN is not defined in the environment variables.");
+           throw new Error("Email service is misconfigured");
+       }
+
+       const response = await fetch(relayUrl, {
+           method: "POST",
+           headers: {
+               "Content-Type": "application/json"
+           },
+           body: JSON.stringify({
+               token: relayToken,
+               to: to,
+               subject: subject,
+               text: text
+           })
+       });
+
+       if (!response.ok) {
+           throw new Error(`Gmail Relay HTTP Error: ${response.statusText}`);
+       }
+
+       const result = await response.json();
+       if (result.status !== "success") {
+           throw new Error(`Gmail Relay Error: ${result.message}`);
+       }
+
+       console.log("Email sent successfully via Gmail HTTP Relay");
    } catch (error) {
-    console.log("error in sending mail",error)
-    throw error
+       console.log("error in sending mail",error)
+       throw error
    } 
 }
